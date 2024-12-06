@@ -5,11 +5,11 @@ import (
 	"strconv"
 )
 
-type runtime int32
+type Runtime int32
 
 // The rule about pointers vs. values for receivers is that value methods can be invoked on
 // pointers and values, but pointer methods can only be invoked on pointers.
-func (r runtime) MarshalJSON() ([]byte, error) {
+func (r Runtime) MarshalJSON() ([]byte, error) {
 	// Generate a string containing the movie runtime in the required format.
 	jsonValue := fmt.Sprintf("%d mins", r)
 

@@ -9,6 +9,7 @@ import (
 	_ "github.com/lib/pq"
 	"greenlight.vishaaxl.net/internal/data"
 	"greenlight.vishaaxl.net/internal/jsonlog"
+	"greenlight.vishaaxl.net/internal/mailer"
 )
 
 const version = "1.0.0"
@@ -18,6 +19,7 @@ type config struct {
 	env     string
 	db      db
 	limiter limiter
+	smtp    smtp
 }
 
 type limiter struct {
@@ -33,10 +35,19 @@ type db struct {
 	maxIdleTime  time.Duration
 }
 
+type smtp struct {
+	host     string
+	port     int
+	username string
+	password string
+	sender   string
+}
+
 type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
 }
 
 func main() {
@@ -55,6 +66,13 @@ func main() {
 			burst:   4,
 			enabled: true,
 		},
+		smtp: smtp{
+			host:     "sandbox.smtp.mailtrap.io",
+			port:     2525,
+			username: "",
+			password: "",
+			sender:   "Greenlight <no-reply@greenlight.vishaaxl.net>",
+		},
 	}
 
 	db, err := openDB(cfg)
@@ -69,6 +87,7 @@ func main() {
 		logger: logger,
 		config: cfg,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
 	// Call app.serve() to start the server.

@@ -53,11 +53,12 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	err = app.mailer.Send(user.Email, "Welcome to greenlight", "user_welcome.gohtml", user)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "Welcome to greenlight", "user_welcome.gohtml", user)
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
 
 	// Write a JSON response containing the user data along with a 201 Created status
 	// code.

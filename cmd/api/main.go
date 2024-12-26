@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
+	"flag"
+	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -13,7 +17,12 @@ import (
 	"greenlight.vishaaxl.net/internal/mailer"
 )
 
-const version = "1.0.0"
+// Create a buildTime variable to hold the executable binary build time. Note that this
+// must be a string type, as the -X linker flag will only work with string variables.
+var (
+	buildTime string
+	version   string
+)
 
 type config struct {
 	port    int
@@ -21,6 +30,7 @@ type config struct {
 	db      db
 	limiter limiter
 	smtp    smtp
+	cors    cors
 }
 
 type limiter struct {
@@ -52,7 +62,17 @@ type application struct {
 	wg     sync.WaitGroup
 }
 
+type cors struct {
+	trustedOrigins []string
+}
+
 func main() {
+	expvar.NewString("version").Set(version)
+
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 	cfg := config{
 		port: 8080,
@@ -75,6 +95,19 @@ func main() {
 			password: "",
 			sender:   "Greenlight <no-reply@greenlight.vishaaxl.net>",
 		},
+		cors: cors{
+			trustedOrigins: []string{"http://localhost:3000"},
+		},
+	}
+
+	// Create a new version boolean flag with the default value of false.
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+	flag.Parse()
+
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		fmt.Printf("Build time:\t%s\n", buildTime)
+		os.Exit(0)
 	}
 
 	db, err := openDB(cfg)
@@ -91,6 +124,14 @@ func main() {
 		models: data.NewModels(db),
 		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
+
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		return db.Stats()
+	}))
+
+	expvar.Publish("timestamp", expvar.Func(func() interface{} {
+		return time.Now().Unix()
+	}))
 
 	// Call app.serve() to start the server.
 	err = app.serve()
